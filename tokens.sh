@@ -18,9 +18,25 @@ if [ -f tokens.sh.secrets ]; then
  source tokens.sh.secrets
 fi
 
+# Portable alternative to curl binary
+function __curl() {
+  read proto server path <<<$(echo ${1//// })
+  DOC=/${path// //}
+  HOST=${server//:*}
+  PORT=${server//*:}
+  [[ x"${HOST}" == x"${PORT}" ]] && PORT=80
+
+  exec 3<>/dev/tcp/${HOST}/$PORT
+  echo -en "GET ${DOC} HTTP/1.0\r\nHost: ${HOST}\r\n\r\n" >&3
+  (while read line; do
+   [[ "$line" == $'\r' ]] && break
+  done && cat) <&3
+  exec 3>&-
+}
+
 
 # Build a curl command to get the wallet balance
-CURL_COMMAND="curl -s 'https://api.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0xb64ef51c888972c908cfacf59b47c1afbc0ab8ac&tag=latest&address=$WALLET_ADDRESS&apikey=$ETHERSCAN_API_KEY'"
+CURL_COMMAND="__curl 'https://api.etherscan.io/api?module=account&action=tokenbalance&contractaddress=0xb64ef51c888972c908cfacf59b47c1afbc0ab8ac&tag=latest&address=$WALLET_ADDRESS&apikey=$ETHERSCAN_API_KEY'"
 
 # Execute the curl command. The output should give something similar to :
 #   {"status":"1","message":"OK","result":"11235363320"}
